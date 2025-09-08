@@ -246,5 +246,4 @@ pip install numpy --upgrade # or -U
 
 ```
 
-To continue with the guide or other notebook (`.ipynb` files) double click on them once inside VScode.
-To continue with the guide or other notebook (`.ipynb` files) double-click them inside VS Code.
+To continue with the guide move on to `basic_ml_code_and_concepts.ipynb`. Python notebooks (`.ipynb` files) can be double clicked to entire once inside VScode.
