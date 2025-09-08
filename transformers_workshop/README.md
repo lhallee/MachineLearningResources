@@ -1,4 +1,4 @@
-## Transformers Workshop
+## Transformers Workshop - September 23rd, 2025
 
 Full resources coming soon!
 
