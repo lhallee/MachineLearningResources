@@ -37,7 +37,7 @@ python -m pip install -r requirements.txt
 - `assets/`: Images used throughout this guide
 - `data/`: Sample datasets (e.g., MNIST files)
 - `saved_images/`: Images saved by example code
-- `transformers_workshop/`: Additional workshop materials (if present)
+- `transformers_workshop/`: Additional workshop materials for the 2025 Transformers Workshop
 
 ## What is Machine Learning?
 
