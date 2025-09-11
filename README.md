@@ -137,13 +137,13 @@ Additionally, there is a specialized resource for ML called TPUs. TPUs, or Tenso
 
 ## Learning resources
 
-A compilation of resources that give a foundation of data science knowledge in general. There is a fairly detailed description of concepts that current projects in the lab use below, but are bound to be confusing to people new to ML. Please use these resources as needed to make concepts more understandable. There is no expectation for going through a certain amount of these to start ML projects in the lab, but the more general data science concepts you know the more intuitive ML becomes and the better ML engineer you will be.
+Please use these resources as needed to make concepts more understandable!
 
 #### **High-Level**
 
 Python script with basic components, click to view in browser
 
-[intro_to_python.py](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/6a163c46-d8d4-477a-8fef-4a3dd014a480/intro_to_python.py)
+[intro_to_python.py](https://github.com/lhallee/MachineLearningResources/blob/main/intro_to_python.py)
 
 Beginner Python, approximately equivalent to **BINF690 Programming for Bioinformatics**
 
