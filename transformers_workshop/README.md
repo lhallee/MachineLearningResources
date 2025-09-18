@@ -8,15 +8,15 @@ Location Fintech 516 - [Directions](https://www.google.com/maps?gs_lcrp=EgZjaHJv
 
 Zoom [link](https://udel.zoom.us/j/92582067018?jst=2)
 
-**Total Duration:** 7 hours
+**Total Duration:** 6 hours
 
 ### Structure
-- 3 hours lecturing with slides
-- 30-60 minutes lunch break
+- 2 hours lecturing with slides
 - 60 minutes setup and general discussion
+- 30-60 minutes lunch break
 - 2 hours hands-on coding (Jupyter Notebooks)
 
-### Morning Session: Lecture (3 hours)
+### Morning Session: Lecture (2 hours)
 #### Part 1: Linear Algebra for Machine Learning and Neural Networks (30 minutes)
 - Scalars, vectors, and matrices: notation and interpretation
 - Dot products and similarity metrics (cosine similarity, Euclidean distance)
@@ -36,7 +36,7 @@ Zoom [link](https://udel.zoom.us/j/92582067018?jst=2)
   - Adam, AdamW
 - Loss surfaces and the role of optimization in training
 
-#### Part 3: Internals of the Transformer Architecture (1 hour)
+#### Part 3: Internals of the Transformer Architecture (30 minutes)
 - Overview of the transformer model
 - Token embeddings and special tokens (CLS, padding)
 - Self-attention mechanism:
@@ -53,14 +53,12 @@ Zoom [link](https://udel.zoom.us/j/92582067018?jst=2)
   - Positional encodings
   - Output heads for classification and sequence modeling
 
-#### Part 4: NLP and PLMs (1 hour)
+#### Part 4: NLP and PLMs (30 minutes)
 - Modeling words and images with transformers
 - Modeling biological sequences
 - Pretraining types
 - Finetuning and transfer learning
 - Recent findings on pretraining
-
-### Lunch Break (30-60 minutes)
 
 ### Afternoon Session: Setup and Interactive Labs
 #### Environment Setup and Open Discussion (60 minutes)
@@ -72,7 +70,9 @@ Zoom [link](https://udel.zoom.us/j/92582067018?jst=2)
   - Interpretability of attention mechanisms
   - Model size versus dataset requirements
   - Limitations of transformers in small-data settings
-  - More to come…
+
+
+### Lunch Break (30-60 minutes)
 
 ### Hands-On Jupyter Notebooks (2 hours)
 #### Notebook 1: Implementing Attention from Scratch (30 minutes)
