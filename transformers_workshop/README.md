@@ -78,11 +78,9 @@ Zoom [link](https://udel.zoom.us/j/92582067018?jst=2)
 #### Notebook 1: Implementing Attention from Scratch (30 minutes)
 - Manual implementation of attention using PyTorch
 - Looking at more efficient implementations
-- Basic MLP sections
-- Full transformer block
-- Comparing transformers to other network types
 
 #### Notebook 2: Building a Minimal Transformer Encoder Block (30 minutes)
+- Basic MLP sections
 - Construction of a simplified transformer block
 - Integration of LayerNorm, Multi-head Attention, Feedforward Layers
 - Implementation of residual connections
