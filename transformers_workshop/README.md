@@ -72,7 +72,7 @@ Zoom [link](https://udel.zoom.us/j/92582067018?jst=2)
   - Limitations of transformers in small-data settings
 
 
-### Lunch Break (30-60 minutes)
+### Lunch Break (60 minutes)
 
 ### Hands-On Jupyter Notebooks (2 hours)
 #### Notebook 1: Implementing Attention from Scratch (30 minutes)
