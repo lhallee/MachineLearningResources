@@ -6,7 +6,8 @@ scikit-learn
 matplotlib
 pandas
 scipy
-keras
+tf_keras
 transformers
 datasets
 torchinfo
+einops
