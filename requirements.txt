@@ -7,3 +7,6 @@ matplotlib
 pandas
 scipy
 keras
+transformers
+datasets
+torchinfo
