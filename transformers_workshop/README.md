@@ -73,28 +73,21 @@ https://docs.google.com/presentation/d/1kQoffVAUM716_ets9Eqkqh8KQNHYwwDv4YhIJqPH
 ### Lunch Break (60 minutes)
 
 ### Hands-On Jupyter Notebooks (2 hours)
-#### Notebook 1: Implementing Attention from Scratch (30 minutes)
-- Manual implementation of attention using PyTorch
-- Looking at more efficient implementations
+#### Notebook 1: Intuition for ML
+- Basics of linear regression
+- Average prototype classifier
+- PyTorch 
 
 #### Notebook 2: Building a Minimal Transformer Encoder Block (30 minutes)
-- Basic MLP sections
-- Construction of a simplified transformer block
-- Integration of LayerNorm, Multi-head Attention, Feedforward Layers
-- Implementation of residual connections
-- Forward pass on synthetic data
-- Analysis of output hidden states
+- Basic attention implementations
+- MLPs
+- Transformer block
 
 #### Notebook 3: Comparing Transformers to Other Architectures (30 minutes)
-- MNIST data with:
-  - Basic ViT
-  - ConvNet
-  - MLP
+- MNIST with MLP vs. CNN vs. Transformer - Who will win?
 
-#### Notebook 4: Working with Biological Sequences and Transformers (30 minutes)
-- Protify
-- Probing networks
-- Protein and other sequence considerations
+#### Notebook 4: Challenge: Secondary Structure Prediction of Proteins (30 minutes)
+- Use transformer networks to predict the secondary structure of proteins
 
 ### Workshop Wrap-Up
 - Summary of major concepts
