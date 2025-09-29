@@ -1,12 +1,10 @@
 ## Transformers Workshop - September 23rd, 2025
 
-Full resources coming soon!
+Part 1 of the workshop, the lecture, is now on [YouTube](https://youtu.be/TXPSDArW5MY):
+https://youtu.be/TXPSDArW5MY
 
-RSVP [here](https://docs.google.com/forms/d/14smYLDO3aV03hVxDcVeilne-Uqch8ywKA_CdngCtClo)
-
-Location Fintech 516 - [Directions](https://www.google.com/maps?gs_lcrp=EgZjaHJvbWUyCggAEEUYFhgeGDkyCggBEAAYChgWGB4yCAgCEAAYFhgeMggIAxAAGBYYHjIICAQQABgWGB4yCAgFEAAYFhgeMggIBhAAGBYYHjIGCAcQRRg80gEINDMyNmowajeoAgCwAgA&um=1&ie=UTF-8&fb=1&gl=us&sa=X&geocode=KffXNNduq8eJMfD2uB_J3qQy&daddr=591+Collaboration+Way,+Newark,+DE+19713)
-
-Zoom [link](https://udel.zoom.us/j/92582067018?jst=2)
+You can find the slides [here](https://docs.google.com/presentation/d/1kQoffVAUM716_ets9Eqkqh8KQNHYwwDv4YhIJqPHUaU/edit?usp=sharing):
+https://docs.google.com/presentation/d/1kQoffVAUM716_ets9Eqkqh8KQNHYwwDv4YhIJqPHUaU/edit?usp=sharing
 
 **Total Duration:** 6 hours
 
