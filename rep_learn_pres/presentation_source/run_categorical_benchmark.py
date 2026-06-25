@@ -1,12 +1,14 @@
 import argparse
 import json
 import math
+import os
 import random
 import sys
 import time
 import urllib.parse
 import urllib.request
 import zipfile
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -90,6 +92,7 @@ DEFAULT_CATEGORY_MIN_COUNT = 10
 DEFAULT_MAX_TOTAL_VOCAB = 50_000
 DEFAULT_MAX_VOCAB_PER_COLUMN = 10_000
 DEFAULT_NUM_WORKERS = 16
+DEFAULT_FEATURE_WORKERS = 16
 DEFAULT_PREFETCH_FACTOR = 4
 ENCODINGS = ["integer IDs", "one-hot", "learned embeddings"]
 PLOT_COLORS = {
@@ -336,7 +339,9 @@ def parse_args():
     parser.add_argument("--threads", type=int, default=8)
     parser.add_argument("--interop-threads", type=int, default=1)
     parser.add_argument("--num-workers", type=int, default=DEFAULT_NUM_WORKERS)
+    parser.add_argument("--feature-workers", type=int, default=DEFAULT_FEATURE_WORKERS)
     parser.add_argument("--prefetch-factor", type=int, default=DEFAULT_PREFETCH_FACTOR)
+    parser.add_argument("--preprocess-backend", choices=["auto", "pandas", "cudf"], default="auto")
     parser.add_argument("--output-dir", type=Path, default=OUT_DIR)
     parser.add_argument("--loader-only", action="store_true")
     args = parser.parse_args()
@@ -376,6 +381,7 @@ def validate_args(args):
     assert args.threads > 0
     assert args.interop_threads > 0
     assert args.num_workers >= 0
+    assert args.feature_workers >= 0
     assert args.prefetch_factor > 0
     assert len(args.seeds) >= 2
     selected = selected_dataset_slugs(args)
@@ -395,6 +401,37 @@ def configure_torch(args):
     torch.backends.cudnn.benchmark = True
     torch.backends.cuda.matmul.allow_tf32 = False
     torch.backends.cudnn.allow_tf32 = False
+
+
+def resolve_feature_workers(args, categorical_count):
+    if categorical_count <= 1:
+        return 1
+    if args.feature_workers > 0:
+        return min(args.feature_workers, categorical_count)
+    cpu_count = os.cpu_count()
+    if cpu_count is None:
+        cpu_count = 1
+    return min(max(1, cpu_count // 2), categorical_count)
+
+
+def import_cudf_module():
+    try:
+        import cudf
+    except ImportError:
+        return None
+    return cudf
+
+
+def resolve_preprocess_backend(args):
+    if args.preprocess_backend == "pandas":
+        return "pandas", None
+    cudf_module = import_cudf_module()
+    if args.preprocess_backend == "cudf":
+        assert cudf_module is not None, "RAPIDS cuDF was requested with --preprocess-backend cudf, but cudf is not importable."
+        return "cudf", cudf_module
+    if cudf_module is None:
+        return "pandas", None
+    return "cudf", cudf_module
 
 
 def resolve_device(args):
@@ -601,8 +638,11 @@ def clean_frame(frame, spec):
 
     assert categorical, f"{spec.slug} has no categorical feature columns after cleaning."
     for col in tqdm(categorical, desc=f"{spec.slug} categorical clean", unit="feature", leave=False):
-        frame[col] = frame[col].astype("string").fillna("__missing__").str.strip().str.lower()
-        frame[col] = frame[col].replace("", "__missing__")
+        if pd.api.types.is_numeric_dtype(frame[col]):
+            frame[col] = frame[col].fillna(-1)
+        else:
+            frame[col] = frame[col].fillna("__missing__").astype("string")
+            frame[col] = frame[col].replace("", "__missing__")
     for col in tqdm(numeric, desc=f"{spec.slug} numeric clean", unit="feature", leave=False):
         median = frame[col].median()
         if not np.isfinite(median):
@@ -685,7 +725,7 @@ def split_indices(spec, model_target, original_target, args):
         random_state=20260625,
         stratify=hold_stratify,
     )
-    return train_idx, val_idx, test_idx
+    return np.sort(train_idx), np.sort(val_idx), np.sort(test_idx)
 
 
 def effective_vocab_cap(args, categorical_count):
@@ -693,12 +733,50 @@ def effective_vocab_cap(args, categorical_count):
     return min(args.max_vocab_per_column, fair_cap)
 
 
-def encode_column(values, mapping):
-    encoded = values.astype("string").map(mapping).fillna(0)
-    return encoded.to_numpy(dtype=np.int64)
+def encode_column_pandas(values, categories):
+    codes = pd.Categorical(values, categories=categories).codes.astype(np.int64) + 1
+    codes[codes < 0] = 0
+    return codes
 
 
-def fit_preprocessors(frame, numeric, categorical, train_idx, args):
+def encode_column_cudf(values, categories, cudf_module):
+    mapping = {category: idx for idx, category in enumerate(categories, start=1)}
+    gpu_values = cudf_module.Series(values.reset_index(drop=True))
+    codes = gpu_values.map(mapping).fillna(0).astype("int64")
+    return codes.to_pandas().to_numpy(dtype=np.int64)
+
+
+def encode_column(values, categories, backend, cudf_module):
+    if backend == "cudf":
+        return encode_column_cudf(values, categories, cudf_module)
+    return encode_column_pandas(values, categories)
+
+
+def value_counts_pandas(frame, col, train_idx):
+    return frame[col].iloc[train_idx].value_counts(sort=True, dropna=False)
+
+
+def value_counts_cudf(frame, col, train_idx, cudf_module):
+    gpu_values = cudf_module.Series(frame[col].iloc[train_idx].reset_index(drop=True))
+    counts = gpu_values.value_counts(dropna=False)
+    counts = counts.sort_values(ascending=False)
+    return counts.to_pandas()
+
+
+def fit_vocab_column(frame, col, train_idx, min_count, per_column_cap, backend, cudf_module):
+    if backend == "cudf":
+        counts = value_counts_cudf(frame, col, train_idx, cudf_module)
+    else:
+        counts = value_counts_pandas(frame, col, train_idx)
+    keep = counts[counts >= min_count].head(per_column_cap - 1).index.tolist()
+    categories = tuple(keep)
+    inverse = {0: "__unknown__"}
+    for idx, value in enumerate(categories, start=1):
+        inverse[idx] = str(value)
+    return col, categories, inverse, len(categories) + 1
+
+
+def fit_preprocessors(frame, numeric, categorical, train_idx, args, backend, cudf_module):
     scaler = StandardScaler()
     if numeric:
         scaler.fit(frame.loc[train_idx, numeric].to_numpy(dtype=np.float32))
@@ -706,28 +784,60 @@ def fit_preprocessors(frame, numeric, categorical, train_idx, args):
     inv_maps = {}
     vocab_sizes = []
     per_column_cap = effective_vocab_cap(args, len(categorical))
-    for col in tqdm(categorical, desc="vocabulary", unit="feature", leave=False):
-        counts = frame.loc[train_idx, col].value_counts()
-        keep = counts[counts >= args.category_min_count].head(per_column_cap - 1).index.tolist()
-        mapping = {"__unknown__": 0}
-        inverse = {0: "__unknown__"}
-        for value in keep:
-            key = str(value)
-            mapping[key] = len(mapping)
-            inverse[len(inverse)] = key
-        cat_maps[col] = mapping
-        inv_maps[col] = inverse
-        vocab_sizes.append(len(mapping))
+    feature_workers = 1 if backend == "cudf" else resolve_feature_workers(args, len(categorical))
+    print(f"Fitting categorical vocabularies with {backend} using {feature_workers} feature workers.")
+    if feature_workers == 1:
+        for col in tqdm(categorical, desc="vocabulary", unit="feature", leave=False):
+            name, categories, inverse, vocab_size = fit_vocab_column(
+                frame, col, train_idx, args.category_min_count, per_column_cap, backend, cudf_module
+            )
+            cat_maps[name] = categories
+            inv_maps[name] = inverse
+    else:
+        futures = []
+        with ThreadPoolExecutor(max_workers=feature_workers) as executor:
+            for col in categorical:
+                futures.append(executor.submit(fit_vocab_column, frame, col, train_idx, args.category_min_count, per_column_cap, backend, cudf_module))
+            for future in tqdm(as_completed(futures), total=len(futures), desc="vocabulary", unit="feature", leave=False):
+                name, categories, inverse, vocab_size = future.result()
+                cat_maps[name] = categories
+                inv_maps[name] = inverse
+    for col in categorical:
+        vocab_sizes.append(len(cat_maps[col]) + 1)
     return scaler, cat_maps, inv_maps, vocab_sizes
 
 
-def transform_split(frame, numeric, categorical, idx, scaler, cat_maps, model_target, original_target):
+def encode_categorical_columns(frame, categorical, idx, cat_maps, args, backend, cudf_module, desc):
+    x_cat = np.empty((len(idx), len(categorical)), dtype=np.int64)
+    feature_workers = 1 if backend == "cudf" else resolve_feature_workers(args, len(categorical))
+
+    def encode_position(position):
+        col = categorical[position]
+        encoded = encode_column(frame[col].iloc[idx], cat_maps[col], backend, cudf_module)
+        return position, encoded
+
+    if feature_workers == 1:
+        for position in tqdm(range(len(categorical)), desc=desc, unit="feature", leave=False):
+            column_position, encoded = encode_position(position)
+            x_cat[:, column_position] = encoded
+    else:
+        futures = []
+        with ThreadPoolExecutor(max_workers=feature_workers) as executor:
+            for position in range(len(categorical)):
+                futures.append(executor.submit(encode_position, position))
+            for future in tqdm(as_completed(futures), total=len(futures), desc=desc, unit="feature", leave=False):
+                column_position, encoded = future.result()
+                x_cat[:, column_position] = encoded
+    return x_cat
+
+
+def transform_split(frame, numeric, categorical, idx, scaler, cat_maps, model_target, original_target, args, backend, cudf_module, split_name):
     if numeric:
         x_num = scaler.transform(frame.loc[idx, numeric].to_numpy(dtype=np.float32)).astype(np.float32)
     else:
         x_num = np.zeros((len(idx), 0), dtype=np.float32)
-    x_cat = np.column_stack([encode_column(frame.loc[idx, col], cat_maps[col]) for col in categorical]).astype(np.int64)
-    cat_scale = np.array([max(len(cat_maps[col]) - 1, 1) for col in categorical], dtype=np.float32)
+    x_cat = encode_categorical_columns(frame, categorical, idx, cat_maps, args, backend, cudf_module, desc=f"{split_name} categorical encode")
+    cat_scale = np.array([max(len(cat_maps[col]), 1) for col in categorical], dtype=np.float32)
     x_int = np.concatenate([x_num, x_cat.astype(np.float32) / cat_scale], axis=1).astype(np.float32)
     y = model_target[idx]
     y_eval = original_target[idx]
@@ -1541,6 +1651,7 @@ def write_aggregate_outputs(base_dir, all_results, all_summaries, all_comparison
 
 
 def dataset_config_payload(spec, args, device, numeric, categorical, vocab_sizes, split_counts):
+    backend, cudf_module = resolve_preprocess_backend(args)
     return {
         "dataset": spec.slug,
         "name": spec.name,
@@ -1573,6 +1684,9 @@ def dataset_config_payload(spec, args, device, numeric, categorical, vocab_sizes
             "max_vocab_per_column": int(args.max_vocab_per_column),
             "device": str(device),
             "precision": "float32",
+            "feature_workers": int(args.feature_workers),
+            "preprocess_backend": backend,
+            "resolved_feature_workers": int(1 if backend == "cudf" else resolve_feature_workers(args, len(categorical))),
             "torch_version": torch.__version__,
         },
     }
@@ -1585,12 +1699,22 @@ def run_dataset(spec, args, device):
     print(f"\n=== Dataset: {spec.slug} ===")
     frame = load_dataset_frame(spec, args, cache_dir)
     frame, numeric, categorical = clean_frame(frame, spec)
+    preprocess_backend, cudf_module = resolve_preprocess_backend(args)
+    print(f"Preprocessing backend: {preprocess_backend}")
     model_target, original_target, class_names = prepare_target(frame, spec)
     train_idx, val_idx, test_idx = split_indices(spec, model_target, original_target, args)
-    scaler, cat_maps, inv_maps, vocab_sizes = fit_preprocessors(frame, numeric, categorical, train_idx, args)
-    train_num, train_cat, train_int, train_y, train_eval = transform_split(frame, numeric, categorical, train_idx, scaler, cat_maps, model_target, original_target)
-    val_num, val_cat, val_int, val_y, val_eval = transform_split(frame, numeric, categorical, val_idx, scaler, cat_maps, model_target, original_target)
-    test_num, test_cat, test_int, test_y, test_eval = transform_split(frame, numeric, categorical, test_idx, scaler, cat_maps, model_target, original_target)
+    scaler, cat_maps, inv_maps, vocab_sizes = fit_preprocessors(
+        frame, numeric, categorical, train_idx, args, preprocess_backend, cudf_module
+    )
+    train_num, train_cat, train_int, train_y, train_eval = transform_split(
+        frame, numeric, categorical, train_idx, scaler, cat_maps, model_target, original_target, args, preprocess_backend, cudf_module, "train"
+    )
+    val_num, val_cat, val_int, val_y, val_eval = transform_split(
+        frame, numeric, categorical, val_idx, scaler, cat_maps, model_target, original_target, args, preprocess_backend, cudf_module, "validation"
+    )
+    test_num, test_cat, test_int, test_y, test_eval = transform_split(
+        frame, numeric, categorical, test_idx, scaler, cat_maps, model_target, original_target, args, preprocess_backend, cudf_module, "test"
+    )
     split_counts = {"train": int(len(train_idx)), "validation": int(len(val_idx)), "test": int(len(test_idx))}
     payload_base = dataset_config_payload(spec, args, device, numeric, categorical, vocab_sizes, split_counts)
     if args.loader_only:

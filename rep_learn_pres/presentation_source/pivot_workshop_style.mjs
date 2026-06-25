@@ -24,6 +24,8 @@ const HERO = path.join(SOURCE_DIR, "assets", "representation-hero.png");
 const BACKPACK = path.join(SOURCE_DIR, "assets", "red-backpack-photo.png");
 const PROTEIN = path.join(SOURCE_DIR, "assets", "protein-language-model.png");
 const TOPK = path.join(SOURCE_DIR, "models", "modernbert_plots", "modernbert_topk_successes.png");
+const TOPK_CAPITALS = path.join(SOURCE_DIR, "models", "modernbert_plots", "modernbert_topk_capitals_crop.png");
+const TOPK_COMPARATIVES = path.join(SOURCE_DIR, "models", "modernbert_plots", "modernbert_topk_comparatives_crop.png");
 const PCA = path.join(SOURCE_DIR, "models", "modernbert_plots", "modernbert_query_pca.png");
 
 const INK = "#1E2D31";
@@ -257,7 +259,7 @@ function drawBarChart(s, items, x, y, w, h, maxValue) {
 }
 
 function drawScatter(s, points, frame, labels, color = BLUE) {
-  addRect(s, "scatter-frame", frame, WHITE, RULE, 1);
+  addRect(s, "scatter-frame", frame, "none", RULE, 1);
   const usable = points.filter((p) => labels.includes(p.label));
   assert(usable.length > 4, "expected enough scatter points");
   const xs = usable.map((p) => p.x);
@@ -386,12 +388,12 @@ async function main() {
 
   s = slide(deck, 5);
   setTitleBody(s, "Dot product", "Vector multiplication that gives a similarity score.");
-  addRoundRect(s, "same-dir", { left: 85, top: 180, width: 290, height: 210 }, WHITE, BLUE, 1.5);
+  addRoundRect(s, "same-dir", { left: 85, top: 180, width: 290, height: 210 }, "none", BLUE, 1.5);
   addText(s, "same-title", "same direction", { left: 110, top: 200, width: 240, height: 25 }, { fontSize: 16, bold: true, color: BLUE, alignment: "center" });
   addLine(s, "same-a", 145, 315, 300, 250, RED, 4);
   addLine(s, "same-b", 145, 315, 330, 285, BLUE, 4);
   addText(s, "same-score", "large positive score", { left: 120, top: 350, width: 220, height: 22 }, { fontSize: 15, bold: true, color: BLUE, alignment: "center" });
-  addRoundRect(s, "diff-dir", { left: 465, top: 180, width: 290, height: 210 }, WHITE, RULE, 1.5);
+  addRoundRect(s, "diff-dir", { left: 465, top: 180, width: 290, height: 210 }, "none", RULE, 1.5);
   addText(s, "diff-title", "different directions", { left: 490, top: 200, width: 240, height: 25 }, { fontSize: 16, bold: true, color: MUTED, alignment: "center" });
   addLine(s, "diff-a", 530, 315, 530, 245, RED, 4);
   addLine(s, "diff-b", 530, 315, 700, 280, BLUE, 4);
@@ -528,21 +530,11 @@ async function main() {
 
   s = slide(deck, 19);
   setTitleBody(s, "ModernBERT Top-k: Capitals", "The nearest-token list often makes the relationship visible.");
-  await addImage(s, "modernbert topk capitals", TOPK, { left: 80, top: 100, width: 800, height: 380 }, "contain", {
-    left: 0.02,
-    top: 0.09,
-    right: 0.02,
-    bottom: 0.63,
-  });
+  await addImage(s, "modernbert topk capitals", TOPK_CAPITALS, { left: 58, top: 128, width: 844, height: 300 }, "contain");
 
   s = slide(deck, 20);
   setTitleBody(s, "ModernBERT Top-k: Comparatives", "The expected word is highlighted when it appears in the top-k list.");
-  await addImage(s, "modernbert topk comparatives", TOPK, { left: 70, top: 92, width: 820, height: 405 }, "contain", {
-    left: 0.02,
-    top: 0.36,
-    right: 0.02,
-    bottom: 0.02,
-  });
+  await addImage(s, "modernbert topk comparatives", TOPK_COMPARATIVES, { left: 78, top: 108, width: 804, height: 380 }, "contain");
 
   s = slide(deck, 21);
   setTitleBody(s, "ModernBERT Local PCA", "Local views are clearer than one global projection.");
@@ -557,8 +549,8 @@ async function main() {
   setTitleBody(s, "ModernBERT Is Not Classic word2vec", "Input embeddings show useful geometry, but ModernBERT is contextual.");
   const caveats = [
     ["king - royalty -> man", "rank 827", "not in top 50", RED],
-    ["king + woman - man -> queen", "rank 6", "top 50", VIOLET],
-    ["queen - royalty -> woman", "rank 16", "top 50", TEAL],
+    ["king + woman - man -> queen", "rank 6", "in top 50", VIOLET],
+    ["queen - royalty -> woman", "rank 16", "in top 50", TEAL],
   ];
   for (let i = 0; i < caveats.length; i += 1) {
     const x = 120 + i * 255;
