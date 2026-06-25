@@ -1,3 +1,4 @@
 -r requirements_categorical_benchmark.txt
 --extra-index-url https://pypi.nvidia.com
-cudf-cu12==26.6.0
+cudf-cu12==26.2.1; python_version < "3.11"
+cudf-cu12==26.6.0; python_version >= "3.11"
