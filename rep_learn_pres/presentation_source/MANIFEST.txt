@@ -1,0 +1,21 @@
+Representation learning presentation source
+
+Contents
+- build_representation_learning_deck_v2.mjs: final PowerPoint builder.
+- build_representation_learning_deck.mjs: earlier deck builder retained for audit trail.
+- run_car_experiment.py: lightweight PyTorch car-price representation experiment.
+- run_modernbert_examples.py: ModernBERT token/vector and fill-mask examples.
+- data/car_experiment_metrics.json: full experiment ledger and held-out metrics.
+- data/car_story_metrics.json: derived slide-friendly metrics from the experiment ledger.
+- data/car_sample_diagnostics.json: illustrative stored prediction-sample diagnostics.
+- models/modernbert_examples.json: ModernBERT example outputs used in the deck.
+- assets/*.png: generated presentation visuals embedded in the deck.
+- qa/contact-sheet.png, qa/deck-montage.webp, qa/inspect.ndjson: final visual QA artifacts.
+
+Not included
+- Raw Hugging Face parquet rows are not stored here to avoid redistributing dataset rows.
+- node_modules, pydeps, model weights, and package caches are not stored here.
+
+Notes
+- The repo copies of the scripts use paths relative to this folder.
+- The final deck remains at ../representation_learning_high_school_talk.pptx.

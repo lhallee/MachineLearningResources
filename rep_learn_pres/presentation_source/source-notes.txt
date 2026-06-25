@@ -1,0 +1,5 @@
+Deck source notes
+Outline: rep_learn_pres/outline.md
+Car dataset: gsv24/car-price on Hugging Face. Used 25,000 deterministic rows for laptop-friendly PyTorch training.
+Language model: answerdotai/ModernBERT-base on Hugging Face. Used masked-token examples and an honest input-embedding caveat.
+Generated with @oai/artifact-tool from a plain JavaScript ES module.

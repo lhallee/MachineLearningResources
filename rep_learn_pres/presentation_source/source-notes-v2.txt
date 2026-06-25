@@ -1,0 +1,6 @@
+Deck source notes
+Car dataset: gsv24/car-price on Hugging Face.
+Car sample diagnostics: derived from stored prediction samples in the experiment ledger; full-test metrics remain the main reported result.
+Language model: answerdotai/ModernBERT-base on Hugging Face.
+Protein language model references: ProtTrans arXiv:2007.06225 and ESM protein language model literature.
+Generated visual assets are stored in the presentation scratch assets folder.
