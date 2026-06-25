@@ -1536,6 +1536,21 @@ def color_for_label(label):
     return "#5D6670"
 
 
+def annotation_offset(index, coords):
+    x_value = float(coords[index, 0])
+    median_x = float(np.median(coords[:, 0]))
+    dx = 9 if x_value <= median_x else -9
+    dy_pattern = [7, -9, 19, -21, 31, -33]
+    close_prior = 0
+    for prior in range(index):
+        distance = float(np.linalg.norm(coords[index] - coords[prior]))
+        if distance < 0.55:
+            close_prior += 1
+    dy = dy_pattern[close_prior % len(dy_pattern)]
+    horizontal_alignment = "left" if dx > 0 else "right"
+    return dx, dy, horizontal_alignment
+
+
 def plot_color_embedding_projection(best_embedding_result, inv_maps, categorical, path):
     color_features = [feature for feature in ("exterior_color", "interior_color") if feature in categorical]
     if not color_features or "embedding_weights" not in best_embedding_result:
@@ -1547,7 +1562,7 @@ def plot_color_embedding_projection(best_embedding_result, inv_maps, categorical
         plt.close(fig)
         return
 
-    fig, axes = plt.subplots(1, len(color_features), figsize=(7 * len(color_features), 6), squeeze=False)
+    fig, axes = plt.subplots(1, len(color_features), figsize=(7.5 * len(color_features), 6.2), squeeze=False)
     weights_list = best_embedding_result["embedding_weights"]
     for axis, feature in zip(axes[0], color_features):
         feature_index = categorical.index(feature)
@@ -1562,13 +1577,26 @@ def plot_color_embedding_projection(best_embedding_result, inv_maps, categorical
             continue
         coords = PCA(n_components=2, random_state=20260624).fit_transform(weights[1 : len(labels) + 1])
         colors = [color_for_label(label) for label in labels]
-        axis.scatter(coords[:, 0], coords[:, 1], color=colors, edgecolor="#17201C", linewidth=0.5, s=55, alpha=0.9)
+        axis.scatter(coords[:, 0], coords[:, 1], color=colors, edgecolor="#17201C", linewidth=0.7, s=78, alpha=0.95, zorder=3)
         for idx, label in enumerate(labels):
-            axis.annotate(label, (coords[idx, 0], coords[idx, 1]), xytext=(4, 3), textcoords="offset points", fontsize=8)
-        axis.set_title(f"Learned color embedding PCA: {feature.replace('_', ' ')}")
+            dx, dy, horizontal_alignment = annotation_offset(idx, coords)
+            axis.annotate(
+                label,
+                (coords[idx, 0], coords[idx, 1]),
+                xytext=(dx, dy),
+                textcoords="offset points",
+                fontsize=9,
+                ha=horizontal_alignment,
+                va="center",
+                bbox={"boxstyle": "round,pad=0.18", "facecolor": "#FAF8F2", "edgecolor": "#D5CCBD", "linewidth": 0.6},
+                arrowprops={"arrowstyle": "-", "color": "#8A8174", "linewidth": 0.6, "shrinkA": 0, "shrinkB": 6},
+                zorder=4,
+            )
+        axis.set_title(f"{feature.replace('_', ' ').title()} Embeddings")
         axis.set_xlabel("PC1")
         axis.set_ylabel("PC2")
         style_axis(axis)
+    fig.suptitle("Learned Car Color Embeddings PCA", fontsize=16, y=1.02)
     fig.tight_layout()
     fig.savefig(path, dpi=180, bbox_inches="tight")
     plt.close(fig)
