@@ -1,0 +1,3 @@
+scope,dataset,task,metric,higher_is_better,first_encoding,second_encoding,pair_label,seed_count,mean_paired_improvement,median_paired_improvement,ci95_low,ci95_high,win_count,loss_count,tie_count,paired_t_p_value,wilcoxon_p_value
+dataset,car-price,regression,test_rmse,False,learned embeddings,integer IDs,Embedding vs integer,3,94.17071868453691,107.96653864720884,53.117643192614764,121.42797421378714,3,0,0,0.045855753502427904,0.25
+aggregate-regression,ALL,regression,task_primary_metric,True,learned embeddings,integer IDs,Embedding vs integer,3,94.17071868453691,107.96653864720884,53.117643192614764,121.42797421378714,3,0,0,0.045855753502427904,0.25

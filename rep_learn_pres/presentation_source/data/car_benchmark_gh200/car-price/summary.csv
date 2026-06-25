@@ -1,0 +1,3 @@
+dataset,encoding,task,primary_metric,primary_higher_is_better,primary_mean,primary_std,best_val_loss_mean,params_mean,run_seconds_mean,throughput_mean
+car-price,integer IDs,regression,test_rmse,False,1014.000032938321,45.20111707220345,0.0013029124618818362,3176449.0,26.681742968348164,261277.24043812673
+car-price,learned embeddings,regression,test_rmse,False,919.8293142537841,56.978835182115304,0.001050516515194128,3225425.0,37.18491987135106,209003.30822441427

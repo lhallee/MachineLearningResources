@@ -95,6 +95,7 @@ DEFAULT_NUM_WORKERS = 16
 DEFAULT_FEATURE_WORKERS = 16
 DEFAULT_PREFETCH_FACTOR = 4
 ENCODINGS = ["integer IDs", "learned embeddings"]
+SKIP_BY_DEFAULT = {"bank-marketing"}
 PLOT_COLORS = {
     "integer IDs": "#B83B2E",
     "learned embeddings": "#2F6FDB",
@@ -339,6 +340,7 @@ def parse_args():
     parser.add_argument("--feature-workers", type=int, default=DEFAULT_FEATURE_WORKERS)
     parser.add_argument("--prefetch-factor", type=int, default=DEFAULT_PREFETCH_FACTOR)
     parser.add_argument("--preprocess-backend", choices=["auto", "pandas", "cudf"], default="auto")
+    parser.add_argument("--rerun-completed", action="store_true")
     parser.add_argument("--output-dir", type=Path, default=OUT_DIR)
     parser.add_argument("--loader-only", action="store_true")
     args = parser.parse_args()
@@ -388,7 +390,7 @@ def validate_args(args):
 
 def selected_dataset_slugs(args):
     if args.all_datasets or args.datasets is None:
-        return list(DATASET_REGISTRY.keys())
+        return [slug for slug in DATASET_REGISTRY.keys() if slug not in SKIP_BY_DEFAULT]
     return args.datasets
 
 
@@ -1509,6 +1511,69 @@ def plot_embedding_projection(best_embedding_result, inv_maps, categorical, path
     plt.close(fig)
 
 
+def color_for_label(label):
+    text = str(label).lower()
+    color_rules = [
+        ("black", "#151515"),
+        ("white", "#F2F0E8"),
+        ("gray", "#8E969B"),
+        ("grey", "#8E969B"),
+        ("silver", "#BFC4C7"),
+        ("blue", "#2F6FDB"),
+        ("red", "#B83B2E"),
+        ("green", "#3D7D4D"),
+        ("brown", "#7A4E2C"),
+        ("tan", "#C8A46A"),
+        ("beige", "#D7C59D"),
+        ("gold", "#DCA62B"),
+        ("yellow", "#E3C64B"),
+        ("orange", "#D8782C"),
+        ("purple", "#7651A4"),
+    ]
+    for token, color in color_rules:
+        if token in text:
+            return color
+    return "#5D6670"
+
+
+def plot_color_embedding_projection(best_embedding_result, inv_maps, categorical, path):
+    color_features = [feature for feature in ("exterior_color", "interior_color") if feature in categorical]
+    if not color_features or "embedding_weights" not in best_embedding_result:
+        fig, axis = plt.subplots(figsize=(8, 5))
+        axis.text(0.5, 0.5, "No color embedding features available", ha="center", va="center")
+        axis.set_axis_off()
+        fig.tight_layout()
+        fig.savefig(path, dpi=180, bbox_inches="tight")
+        plt.close(fig)
+        return
+
+    fig, axes = plt.subplots(1, len(color_features), figsize=(7 * len(color_features), 6), squeeze=False)
+    weights_list = best_embedding_result["embedding_weights"]
+    for axis, feature in zip(axes[0], color_features):
+        feature_index = categorical.index(feature)
+        weights = weights_list[feature_index]
+        inverse = inv_maps[feature]
+        labels = []
+        for idx in range(1, min(weights.shape[0], 41)):
+            labels.append(inverse[idx])
+        if len(labels) < 3:
+            axis.text(0.5, 0.5, "Not enough colors for PCA", ha="center", va="center")
+            axis.set_axis_off()
+            continue
+        coords = PCA(n_components=2, random_state=20260624).fit_transform(weights[1 : len(labels) + 1])
+        colors = [color_for_label(label) for label in labels]
+        axis.scatter(coords[:, 0], coords[:, 1], color=colors, edgecolor="#17201C", linewidth=0.5, s=55, alpha=0.9)
+        for idx, label in enumerate(labels):
+            axis.annotate(label, (coords[idx, 0], coords[idx, 1]), xytext=(4, 3), textcoords="offset points", fontsize=8)
+        axis.set_title(f"Learned color embedding PCA: {feature.replace('_', ' ')}")
+        axis.set_xlabel("PC1")
+        axis.set_ylabel("PC2")
+        style_axis(axis)
+    fig.tight_layout()
+    fig.savefig(path, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+
+
 def plot_comparisons(comparison_rows, path, title):
     if not comparison_rows:
         return
@@ -1569,8 +1634,40 @@ def output_paths(base_dir, slug):
         "curves_plot": plot_dir / "learning_curves.png",
         "prediction_plot": plot_dir / "predictions.png",
         "embedding_plot": plot_dir / "embedding_projection.png",
+        "color_embedding_plot": plot_dir / "color_embedding_projection.png",
         "comparison_plot": plot_dir / "method_comparisons.png",
     }
+
+
+def dataframe_records(path):
+    return pd.read_csv(path).to_dict("records")
+
+
+def cached_result_complete(paths, args):
+    required = ["metrics_json", "summary_csv", "runs_csv", "comparisons_csv"]
+    for key in required:
+        if not paths[key].is_file():
+            return False
+    try:
+        payload = json.loads(paths["metrics_json"].read_text(encoding="utf-8"))
+        runs = payload["runs"]
+    except (json.JSONDecodeError, KeyError):
+        return False
+    expected_runs = len(ENCODINGS) * len(args.seeds)
+    if len(runs) != expected_runs:
+        return False
+    observed = {(row["encoding"], int(row["seed"])) for row in runs}
+    expected = {(encoding, int(seed)) for encoding in ENCODINGS for seed in args.seeds}
+    return observed == expected
+
+
+def load_cached_dataset_outputs(spec, paths):
+    print(f"Using cached completed results for {spec.slug}: {paths['dataset_dir']}")
+    payload = json.loads(paths["metrics_json"].read_text(encoding="utf-8"))
+    results = payload["runs"]
+    summaries = dataframe_records(paths["summary_csv"])
+    comparisons = dataframe_records(paths["comparisons_csv"])
+    return results, summaries, comparisons
 
 
 def write_dataset_outputs(spec, payload, summary_rows, results, comparison_rows, inv_maps, categorical, paths, args):
@@ -1586,6 +1683,7 @@ def write_dataset_outputs(spec, payload, summary_rows, results, comparison_rows,
     plot_predictions(results, spec, paths["prediction_plot"])
     best_embedding = sorted([row for row in results if row["encoding"] == "learned embeddings"], key=lambda row: row["best_val_loss"])[0]
     plot_embedding_projection(best_embedding, inv_maps, categorical, paths["embedding_plot"])
+    plot_color_embedding_projection(best_embedding, inv_maps, categorical, paths["color_embedding_plot"])
     plot_comparisons(comparison_rows, paths["comparison_plot"], f"{spec.slug} paired method comparisons")
     paths["metrics_json"].write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
@@ -1670,6 +1768,8 @@ def run_dataset(spec, args, device):
     cache_dir = args.output_dir / "_cache" / spec.slug
     paths = output_paths(args.output_dir, spec.slug)
     print(f"\n=== Dataset: {spec.slug} ===")
+    if not args.loader_only and not args.rerun_completed and cached_result_complete(paths, args):
+        return load_cached_dataset_outputs(spec, paths)
     frame = load_dataset_frame(spec, args, cache_dir)
     frame, numeric, categorical = clean_frame(frame, spec)
     preprocess_backend, cudf_module = resolve_preprocess_backend(args)
