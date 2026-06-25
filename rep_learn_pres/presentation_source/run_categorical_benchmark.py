@@ -81,9 +81,9 @@ DEFAULT_EVAL_EVERY_EXAMPLES = 100_000
 DEFAULT_BATCH_SIZE = 4096
 DEFAULT_LEARNING_RATE = 3e-4
 DEFAULT_WEIGHT_DECAY = 1e-4
-DEFAULT_EMBEDDING_SIZE = 32
+DEFAULT_EMBEDDING_SIZE = 16
 DEFAULT_DROPOUT = 0.2
-DEFAULT_HIDDEN_SIZES = [8192, 128]
+DEFAULT_HIDDEN_SIZES = [256, 8192, 128]
 DEFAULT_SEEDS = [7, 17, 29]
 DEFAULT_EPOCHS = 200
 DEFAULT_PATIENCE = 3
@@ -641,7 +641,7 @@ def clean_frame(frame, spec):
         if pd.api.types.is_numeric_dtype(frame[col]):
             frame[col] = frame[col].fillna(-1)
         else:
-            frame[col] = frame[col].fillna("__missing__").astype("string")
+            frame[col] = frame[col].astype("string").fillna("__missing__")
             frame[col] = frame[col].replace("", "__missing__")
     for col in tqdm(numeric, desc=f"{spec.slug} numeric clean", unit="feature", leave=False):
         median = frame[col].median()
