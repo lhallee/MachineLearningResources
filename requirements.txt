@@ -5,10 +5,13 @@ tensorflow
 scikit-learn
 matplotlib
 pandas
+pyarrow
 scipy
 tf_keras
 transformers
 datasets
+hf_xet
 torchinfo
 einops
 accelerate
+tqdm

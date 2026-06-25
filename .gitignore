@@ -5,3 +5,5 @@
 *.json
 *.safetensors
 *.bin
+/rep_learn_pres/presentation_source/pydeps
+*.parquet
