@@ -94,16 +94,13 @@ DEFAULT_MAX_VOCAB_PER_COLUMN = 10_000
 DEFAULT_NUM_WORKERS = 16
 DEFAULT_FEATURE_WORKERS = 16
 DEFAULT_PREFETCH_FACTOR = 4
-ENCODINGS = ["integer IDs", "one-hot", "learned embeddings"]
+ENCODINGS = ["integer IDs", "learned embeddings"]
 PLOT_COLORS = {
     "integer IDs": "#B83B2E",
-    "one-hot": "#DCA62B",
     "learned embeddings": "#2F6FDB",
 }
 METHOD_PAIRS = [
-    ("learned embeddings", "one-hot", "Embedding vs one-hot"),
     ("learned embeddings", "integer IDs", "Embedding vs integer"),
-    ("one-hot", "integer IDs", "One-hot vs integer"),
 ]
 
 
@@ -873,43 +870,12 @@ class DenseModel(nn.Module):
         return self.net(x)
 
 
-class OneHotLinearModel(nn.Module):
-    def __init__(self, num_numeric, vocab_sizes, hidden_sizes, dropout, output_dim):
-        super().__init__()
-        self.num_numeric = int(num_numeric)
-        self.vocab_sizes = [int(size) for size in vocab_sizes]
-        offsets = []
-        running = 0
-        for size in self.vocab_sizes:
-            offsets.append(running)
-            running += size
-        self.register_buffer("offsets", torch.tensor(offsets, dtype=torch.long))
-        self.category_weight = nn.Embedding(running, hidden_sizes[0])
-        if self.num_numeric:
-            self.numeric_linear = nn.Linear(self.num_numeric, hidden_sizes[0], bias=False)
-        else:
-            self.numeric_linear = None
-        self.bias = nn.Parameter(torch.zeros(hidden_sizes[0]))
-        self.norm = nn.LayerNorm(hidden_sizes[0])
-        self.activation = nn.ReLU()
-        self.dropout = nn.Dropout(dropout)
-        self.tail = make_mlp_tail(hidden_sizes, dropout, output_dim)
-
-    def forward(self, x_num, x_cat):
-        flat = (x_cat + self.offsets.unsqueeze(0)).reshape(-1)
-        hidden = self.category_weight(flat).reshape(x_cat.shape[0], x_cat.shape[1], -1).sum(dim=1)
-        if self.numeric_linear is not None:
-            hidden = hidden + self.numeric_linear(x_num)
-        hidden = hidden + self.bias
-        hidden = self.dropout(self.activation(self.norm(hidden)))
-        return self.tail(hidden)
-
-
 class EmbeddingModel(nn.Module):
-    def __init__(self, num_numeric, vocab_sizes, emb_dim, hidden_sizes, dropout, output_dim):
+    def __init__(self, num_numeric, vocab_sizes, emb_dims, hidden_sizes, dropout, output_dim):
         super().__init__()
-        self.embeddings = nn.ModuleList([nn.Embedding(size, emb_dim) for size in vocab_sizes])
-        input_dim = num_numeric + emb_dim * len(vocab_sizes)
+        assert len(vocab_sizes) == len(emb_dims)
+        self.embeddings = nn.ModuleList([nn.Embedding(vocab_sizes[idx], emb_dims[idx]) for idx in range(len(vocab_sizes))])
+        input_dim = num_numeric + sum(emb_dims)
         self.net = DenseModel(input_dim, hidden_sizes, dropout, output_dim)
 
     def forward(self, x_num, x_cat):
@@ -1199,13 +1165,19 @@ def primary_metric_value(row, spec):
     return float(row[metric])
 
 
+def embedding_dims_for_args(args, vocab_sizes):
+    return [int(args.embedding_size) for _ in vocab_sizes]
+
+
+def embedding_size_payload(value):
+    return int(value)
+
+
 def build_model(encoding, num_numeric, vocab_sizes, args, output_dim):
     if encoding == "integer IDs":
         return DenseModel(num_numeric + len(vocab_sizes), args.hidden_sizes, args.dropout, output_dim)
-    if encoding == "one-hot":
-        return OneHotLinearModel(num_numeric, vocab_sizes, args.hidden_sizes, args.dropout, output_dim)
     if encoding == "learned embeddings":
-        return EmbeddingModel(num_numeric, vocab_sizes, args.embedding_size, args.hidden_sizes, args.dropout, output_dim)
+        return EmbeddingModel(num_numeric, vocab_sizes, embedding_dims_for_args(args, vocab_sizes), args.hidden_sizes, args.dropout, output_dim)
     raise AssertionError(f"Unknown encoding: {encoding}")
 
 
@@ -1462,8 +1434,8 @@ def plot_learning_curves(curve_rows, path):
 
 
 def plot_predictions(results, spec, path):
-    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-    for axis, encoding in zip(axes, ENCODINGS):
+    fig, axes = plt.subplots(1, len(ENCODINGS), figsize=(5 * len(ENCODINGS), 5), squeeze=False)
+    for axis, encoding in zip(axes[0], ENCODINGS):
         subset = [row for row in results if row["encoding"] == encoding]
         if not subset:
             axis.set_axis_off()
@@ -1673,7 +1645,8 @@ def dataset_config_payload(spec, args, device, numeric, categorical, vocab_sizes
             "learning_rate": float(args.learning_rate),
             "weight_decay": float(args.weight_decay),
             "optimizer": "AdamW",
-            "embedding_size": int(args.embedding_size),
+            "embedding_size": embedding_size_payload(args.embedding_size),
+            "embedding_dims": embedding_dims_for_args(args, vocab_sizes),
             "dropout": float(args.dropout),
             "hidden_sizes": [int(value) for value in args.hidden_sizes],
             "seeds": [int(seed) for seed in args.seeds],
